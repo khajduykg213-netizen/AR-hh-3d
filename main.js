@@ -3,8 +3,11 @@ import { ARButton } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js
 
 let scene, camera, renderer;
 let reticle, hitTestSource = null;
-let mesh = null;
+let solidMesh, edgeHelper, vertexHelper;
+let showEdges = true;
+let showVertices = true;
 
+/* ===== Pinch ===== */
 let isPinching = false;
 let startDistance = 0;
 let startScale = 1;
@@ -29,7 +32,7 @@ function init() {
     ARButton.createButton(renderer, { requiredFeatures: ["hit-test"] })
   );
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.3));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.4));
 
   /* ===== Reticle ===== */
   reticle = new THREE.Mesh(
@@ -46,35 +49,87 @@ function init() {
   controller.addEventListener("select", placeObject);
   scene.add(controller);
 
-  createMesh();
+  /* ===== UI ===== */
+  document.getElementById("toggleEdge").onclick = () => {
+    showEdges = !showEdges;
+    if (edgeHelper) edgeHelper.visible = showEdges;
+    document.getElementById("toggleEdge").innerText =
+      showEdges ? "Ẩn cạnh" : "Hiện cạnh";
+  };
+
+  document.getElementById("toggleVertex").onclick = () => {
+    showVertices = !showVertices;
+    if (vertexHelper) vertexHelper.visible = showVertices;
+    document.getElementById("toggleVertex").innerText =
+      showVertices ? "Ẩn đỉnh" : "Hiện đỉnh";
+  };
+
+  createColoredBox();
 }
 
-/* ================= CREATE OBJECT ================= */
-function createMesh() {
-  const geometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x1e88e5,
-    metalness: 0.3,
-    roughness: 0.4,
-    transparent: true,
-    opacity: 0.95,
+/* ================= CREATE BOX (MỖI MẶT 1 MÀU) ================= */
+function createColoredBox() {
+  const geometry = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+
+  const materials = [
+    new THREE.MeshStandardMaterial({ color: 0xff0000 }), // đỏ
+    new THREE.MeshStandardMaterial({ color: 0x00ff00 }), // xanh lá
+    new THREE.MeshStandardMaterial({ color: 0x0000ff }), // xanh dương
+    new THREE.MeshStandardMaterial({ color: 0xffff00 }), // vàng
+    new THREE.MeshStandardMaterial({ color: 0xff00ff }), // tím
+    new THREE.MeshStandardMaterial({ color: 0x00ffff }), // cyan
+  ];
+
+  solidMesh = new THREE.Mesh(geometry, materials);
+  solidMesh.visible = false;
+  scene.add(solidMesh);
+
+  /* ===== Edges ===== */
+  edgeHelper = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geometry),
+    new THREE.LineBasicMaterial({ color: 0x000000 })
+  );
+  edgeHelper.visible = showEdges;
+  scene.add(edgeHelper);
+
+  /* ===== Vertices ===== */
+  const points = [];
+  geometry.attributes.position.array.forEach((v, i) => {
+    if (i % 3 === 0)
+      points.push(
+        new THREE.Vector3(
+          geometry.attributes.position.array[i],
+          geometry.attributes.position.array[i + 1],
+          geometry.attributes.position.array[i + 2]
+        )
+      );
   });
 
-  mesh = new THREE.Mesh(geometry, material);
-  mesh.visible = false;
-  scene.add(mesh);
+  const vertexGeom = new THREE.BufferGeometry().setFromPoints(points);
+  vertexHelper = new THREE.Points(
+    vertexGeom,
+    new THREE.PointsMaterial({ color: 0x000000, size: 0.01 })
+  );
+  vertexHelper.visible = showVertices;
+  scene.add(vertexHelper);
 }
 
 /* ================= PLACE ================= */
 function placeObject() {
-  if (!reticle.visible || !mesh) return;
-  mesh.position.setFromMatrixPosition(reticle.matrix);
-  mesh.visible = true;
+  if (!reticle.visible) return;
+
+  solidMesh.position.setFromMatrixPosition(reticle.matrix);
+  edgeHelper.position.copy(solidMesh.position);
+  vertexHelper.position.copy(solidMesh.position);
+
+  solidMesh.visible = true;
+  edgeHelper.visible = showEdges;
+  vertexHelper.visible = showVertices;
 }
 
 /* ================= PINCH + ROTATE ================= */
 function handlePinch(frame) {
-  if (!mesh || !mesh.visible) return;
+  if (!solidMesh.visible) return;
 
   const session = renderer.xr.getSession();
   if (!session) return;
@@ -99,19 +154,22 @@ function handlePinch(frame) {
   if (!isPinching) {
     isPinching = true;
     startDistance = distance;
-    startScale = mesh.scale.x;
+    startScale = solidMesh.scale.x;
     startAngle = angle;
-    startRotation = mesh.rotation.y;
+    startRotation = solidMesh.rotation.y;
     return;
   }
 
-  /* ===== SCALE (AN TOÀN) ===== */
   let scale = startScale * (distance / startDistance);
-  scale = THREE.MathUtils.clamp(scale, 0.05, 2.5);
-  mesh.scale.setScalar(scale);
+  scale = THREE.MathUtils.clamp(scale, 0.08, 2.5);
 
-  /* ===== ROTATE ===== */
-  mesh.rotation.y = startRotation + (angle - startAngle);
+  solidMesh.scale.setScalar(scale);
+  edgeHelper.scale.setScalar(scale);
+  vertexHelper.scale.setScalar(scale);
+
+  solidMesh.rotation.y = startRotation + (angle - startAngle);
+  edgeHelper.rotation.y = solidMesh.rotation.y;
+  vertexHelper.rotation.y = solidMesh.rotation.y;
 }
 
 /* ================= LOOP ================= */
