@@ -2,11 +2,10 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>AR Hình Học Không Gian</title>
+  <title>AR Hình học 3D</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-
   <style>
-    body { margin: 0; overflow: hidden; font-family: Arial; }
+    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
     #ui {
       position: absolute;
       top: 10px;
@@ -16,28 +15,18 @@
       padding: 10px;
       border-radius: 8px;
     }
-    button, select {
-      margin-top: 5px;
-      padding: 6px;
-      width: 100%;
+    button {
+      font-size: 14px;
+      padding: 6px 10px;
     }
   </style>
 </head>
-
 <body>
-  <div id="ui">
-    <select id="shapeSelect">
-      <option value="box">Hình lập phương</option>
-      <option value="sphere">Hình cầu</option>
-      <option value="cylinder">Hình trụ</option>
-      <option value="cone">Hình nón</option>
-    </select>
 
-    <button id="toggleEdges">Bật / Tắt cạnh</button>
-    <button id="toggleVertices">Bật / Tắt đỉnh</button>
-    <div id="formula"></div>
-  </div>
+<div id="ui">
+  <button id="btn-ar">🚀 BẬT AR</button>
+</div>
 
-  <script type="module" src="./main.js"></script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>
