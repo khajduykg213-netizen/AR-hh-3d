@@ -2,40 +2,42 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>AR Hình học không gian 3D</title>
-
-  <!-- BẮT BUỘC cho AR -->
+  <title>AR Hình Học Không Gian</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
 
-  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { margin: 0; overflow: hidden; font-family: Arial; }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border-radius: 8px;
+    }
+    button, select {
+      margin-top: 5px;
+      padding: 6px;
+      width: 100%;
+    }
+  </style>
 </head>
 
 <body>
-
-  <!-- ===== BẢNG ĐIỀU KHIỂN ===== -->
   <div id="ui">
-    <b>📐 HÌNH HỌC KHÔNG GIAN AR</b><br />
-
-    <select id="shape">
-      <option value="box">Hình hộp chữ nhật</option>
+    <select id="shapeSelect">
+      <option value="box">Hình lập phương</option>
       <option value="sphere">Hình cầu</option>
       <option value="cylinder">Hình trụ</option>
       <option value="cone">Hình nón</option>
     </select>
 
-    <br />
-
-    <button id="btn-ar">🚀 BẬT AR</button>
-    <button id="toggle-edge">🔲 Cạnh</button>
-    <button id="toggle-vertex">🔴 Đỉnh</button>
-
-    <div id="info" style="margin-top:8px; font-size:14px;"></div>
+    <button id="toggleEdges">Bật / Tắt cạnh</button>
+    <button id="toggleVertices">Bật / Tắt đỉnh</button>
+    <div id="formula"></div>
   </div>
 
-  <!-- ===== MAIN JS ===== -->
-  <script type="module" src="main.js"></script>
-
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
