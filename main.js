@@ -7,6 +7,13 @@ let reticle, hitTestSource = null;
 let showEdges = true;
 let showVertices = true;
 
+/* ===== Gesture ===== */
+let isGesture = false;
+let startDistance = 0;
+let startScale = 1;
+let startAngle = 0;
+let startRotation = 0;
+
 init();
 animate();
 
@@ -61,10 +68,15 @@ function init() {
   controller.addEventListener("select", placeObject);
   scene.add(controller);
 
+  /* ===== Touch gesture ===== */
+  renderer.domElement.addEventListener("touchstart", onTouchStart, { passive: false });
+  renderer.domElement.addEventListener("touchmove", onTouchMove, { passive: false });
+  renderer.domElement.addEventListener("touchend", () => isGesture = false);
+
   createShape("box");
 }
 
-/* ================= CREATE SHAPES ================= */
+/* ================= SHAPES ================= */
 function createShape(type) {
   clearOld();
 
@@ -74,49 +86,42 @@ function createShape(type) {
   switch (type) {
     case "sphere":
       geometry = new THREE.SphereGeometry(0.18, 48, 48);
-      formula = `
-      <b>Hình cầu</b><br>
-      S = 4πr²<br>
-      V = 4/3 πr³`;
+      formula = "Hình cầu<br>S = 4πr²<br>V = 4/3πr³";
       break;
 
     case "cylinder":
       geometry = new THREE.CylinderGeometry(0.15, 0.15, 0.3, 48);
-      formula = `
-      <b>Hình trụ</b><br>
-      S = 2πr(h + r)<br>
-      V = πr²h`;
+      formula = "Hình trụ<br>S = 2πr(h+r)<br>V = πr²h";
       break;
 
     case "cone":
       geometry = new THREE.ConeGeometry(0.16, 0.3, 48);
-      formula = `
-      <b>Hình nón</b><br>
-      S = πr(r + l)<br>
-      V = 1/3 πr²h`;
+      formula = "Hình nón<br>S = πr(r+l)<br>V = 1/3πr²h";
+      break;
+
+    case "prism":
+      geometry = new THREE.CylinderGeometry(0.16, 0.16, 0.3, 3);
+      formula = "Lăng trụ tam giác<br>V = Sđáy·h";
+      break;
+
+    case "pyramid":
+      geometry = new THREE.ConeGeometry(0.18, 0.3, 4);
+      formula = "Chóp tứ giác<br>V = 1/3Sđáy·h";
       break;
 
     default:
       geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-      formula = `
-      <b>Hình lập phương</b><br>
-      S = 6a²<br>
-      V = a³`;
+      formula = "Lập phương<br>S = 6a²<br>V = a³";
   }
 
   document.getElementById("formula").innerHTML = formula;
 
-  /* ===== Material nhiều màu ===== */
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x2196f3,
-    roughness: 0.3,
-    metalness: 0.1
-  });
-
-  mesh = new THREE.Mesh(geometry, material);
+  mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({ color: 0x2196f3, roughness: 0.3 })
+  );
   scene.add(mesh);
 
-  /* ===== Edges ===== */
   edgeHelper = new THREE.LineSegments(
     new THREE.EdgesGeometry(geometry),
     new THREE.LineBasicMaterial({ color: 0x000000 })
@@ -124,18 +129,13 @@ function createShape(type) {
   edgeHelper.visible = showEdges;
   scene.add(edgeHelper);
 
-  /* ===== Vertices ===== */
-  const points = [];
+  const pts = [];
   for (let i = 0; i < geometry.attributes.position.count; i++) {
-    points.push(
-      new THREE.Vector3().fromBufferAttribute(
-        geometry.attributes.position, i
-      )
-    );
+    pts.push(new THREE.Vector3().fromBufferAttribute(geometry.attributes.position, i));
   }
 
   vertexHelper = new THREE.Points(
-    new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.BufferGeometry().setFromPoints(pts),
     new THREE.PointsMaterial({ color: 0xff0000, size: 0.01 })
   );
   vertexHelper.visible = showVertices;
@@ -148,13 +148,50 @@ function clearOld() {
   if (vertexHelper) scene.remove(vertexHelper);
 }
 
-/* ================= PLACE AR ================= */
+/* ================= AR PLACE ================= */
 function placeObject() {
   if (!reticle.visible || !mesh) return;
-
   mesh.position.setFromMatrixPosition(reticle.matrix);
   edgeHelper.position.copy(mesh.position);
   vertexHelper.position.copy(mesh.position);
+}
+
+/* ================= TOUCH ================= */
+function onTouchStart(e) {
+  if (e.touches.length === 2 && mesh) {
+    isGesture = true;
+    startDistance = getDistance(e.touches);
+    startScale = mesh.scale.x;
+    startAngle = getAngle(e.touches);
+    startRotation = mesh.rotation.y;
+  }
+}
+
+function onTouchMove(e) {
+  if (!isGesture || e.touches.length !== 2 || !mesh) return;
+  e.preventDefault();
+
+  const dist = getDistance(e.touches);
+  const angle = getAngle(e.touches);
+
+  let scale = startScale * (dist / startDistance);
+  scale = THREE.MathUtils.clamp(scale, 0.3, 3.0);
+
+  mesh.scale.setScalar(scale);
+  edgeHelper.scale.setScalar(scale);
+  vertexHelper.scale.setScalar(scale);
+
+  mesh.rotation.y = startRotation + (angle - startAngle);
+  edgeHelper.rotation.y = mesh.rotation.y;
+  vertexHelper.rotation.y = mesh.rotation.y;
+}
+
+function getDistance(t) {
+  return Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY);
+}
+
+function getAngle(t) {
+  return Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
 }
 
 /* ================= LOOP ================= */
@@ -178,12 +215,10 @@ function render(_, frame) {
       if (hits.length > 0) {
         reticle.visible = true;
         reticle.matrix.fromArray(hits[0].getPose(refSpace).transform.matrix);
-      } else {
-        reticle.visible = false;
-      }
+      } else reticle.visible = false;
     }
   }
 
-  if (mesh) mesh.rotation.y += 0.01;
+  if (mesh) mesh.rotation.y += 0.005;
   renderer.render(scene, camera);
 }
