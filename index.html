@@ -2,85 +2,44 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>AR Hình học 3D</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-      background: #f2f2f2;
-    }
+  <title>AR Hình học không gian</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+  <style>
+    body { margin: 0; overflow: hidden; font-family: Arial }
     #ui {
       position: fixed;
       top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      z-index: 10;
+      left: 10px;
       background: rgba(255,255,255,0.9);
-      padding: 8px 10px;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-
-    select, button {
-      padding: 6px 10px;
-      font-size: 14px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      cursor: pointer;
-    }
-
-    #formula {
-      position: fixed;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,255,255,0.9);
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 14px;
-      text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      padding: 10px;
+      border-radius: 8px;
       z-index: 10;
-      max-width: 90%;
+    }
+    button, select {
+      display: block;
+      margin-top: 6px;
+      width: 160px;
     }
   </style>
 </head>
 
 <body>
+  <div id="ui">
+    <select id="shape">
+      <option value="box">Hình lập phương</option>
+      <option value="sphere">Hình cầu</option>
+      <option value="cylinder">Hình trụ</option>
+      <option value="cone">Hình nón</option>
+      <option value="prism">Lăng trụ tam giác</option>
+      <option value="pyramid">Chóp tứ giác</option>
+    </select>
 
-<!-- ===== UI ===== -->
-<div id="ui">
-  <button id="btn-ar">Bật AR</button>
+    <button id="toggleEdge">Ẩn/Hiện cạnh</button>
+    <button id="toggleVertex">Ẩn/Hiện đỉnh</button>
+    <button id="toggleRotate">Tắt xoay</button>
+  </div>
 
-  <select id="shape">
-    <option value="box">Hình lập phương</option>
-    <option value="sphere">Hình cầu</option>
-    <option value="cylinder">Hình trụ</option>
-    <option value="cone">Hình nón</option>
-
-    <!-- 🔥 2 KHỐI MỚI -->
-    <option value="prism">Lăng trụ tam giác</option>
-    <option value="pyramid">Hình chóp tứ giác</option>
-  </select>
-
-  <button id="toggleEdge">Ẩn cạnh</button>
-  <button id="toggleVertex">Ẩn đỉnh</button>
-</div>
-
-<!-- ===== Công thức ===== -->
-<div id="formula">
-  Lập phương<br>
-  S = 6a²<br>
-  V = a³
-</div>
-
-<script type="module" src="./main.js"></script>
-
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
