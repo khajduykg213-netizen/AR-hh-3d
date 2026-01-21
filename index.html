@@ -4,14 +4,13 @@
   <meta charset="UTF-8" />
   <title>AR Hình học không gian</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <style>
     body { margin: 0; overflow: hidden; font-family: Arial }
     #ui {
       position: fixed;
       top: 10px;
       left: 10px;
-      background: rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.95);
       padding: 10px;
       border-radius: 8px;
       z-index: 10;
@@ -19,7 +18,7 @@
     button, select {
       display: block;
       margin-top: 6px;
-      width: 160px;
+      width: 180px;
     }
   </style>
 </head>
@@ -35,9 +34,10 @@
       <option value="pyramid">Chóp tứ giác</option>
     </select>
 
-    <button id="toggleEdge">Ẩn/Hiện cạnh</button>
-    <button id="toggleVertex">Ẩn/Hiện đỉnh</button>
+    <button id="toggleEdge">Ẩn / hiện cạnh</button>
+    <button id="toggleVertex">Ẩn / hiện đỉnh</button>
     <button id="toggleRotate">Tắt xoay</button>
+    <button id="toggleNet">Net (trải hình)</button>
   </div>
 
   <script type="module" src="./main.js"></script>
