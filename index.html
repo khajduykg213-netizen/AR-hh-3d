@@ -2,22 +2,23 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<title>AR Hình học 3D – Dạy học</title>
+<title>AR Hình học 3D – Công thức</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
 body{margin:0;overflow:hidden;font-family:Arial}
 #ui{
  position:fixed;top:10px;left:10px;
- background:rgba(255,255,255,0.95);
+ background:rgba(255,255,255,0.96);
  padding:10px;border-radius:10px;z-index:10;
- max-width:180px
+ max-width:220px
 }
 select,button{width:100%;margin-top:6px;padding:6px}
 #info{
  margin-top:6px;
  font-size:13px;
- color:#333;
+ line-height:1.4;
+ color:#222;
 }
 </style>
 </head>
@@ -32,8 +33,7 @@ select,button{width:100%;margin-top:6px;padding:6px}
 <button id="edgesBtn">Ẩn / hiện cạnh</button>
 <button id="vertexBtn">Ẩn / hiện đỉnh</button>
 <button id="rotateBtn">Bật / tắt xoay</button>
-<button id="netBtn">Trải / gập Net</button>
-<div id="info">Chạm 2 đỉnh để đo cạnh</div>
+<div id="info"></div>
 </div>
 
 <script type="module">
@@ -41,10 +41,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160/build/three.mod
 import { ARButton } from "https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/webxr/ARButton.js";
 
 let scene,camera,renderer;
-let model,edges,vertices=[],labels=[];
+let model,edges,vertices=[];
 let autoRotate=false;
-let selected=[]; // đo cạnh
-let netOpen=false;
 
 init();
 animate();
@@ -61,26 +59,46 @@ function init(){
 
  scene.add(new THREE.HemisphereLight(0xffffff,0xbbbbff,1.2));
 
- createShape();
-
  shape.onchange=createShape;
  edgesBtn.onclick=()=>edges.visible=!edges.visible;
  vertexBtn.onclick=()=>vertices.forEach(v=>v.visible=!v.visible);
  rotateBtn.onclick=()=>autoRotate=!autoRotate;
- netBtn.onclick=toggleNet;
 
+ createShape();
  window.addEventListener("resize",resize);
- renderer.domElement.addEventListener("click",onTap);
 }
 
 function createShape(){
  if(model) scene.remove(model);
- vertices=[]; labels=[]; selected=[]; netOpen=false;
+ vertices=[];
 
- let g;
- if(shape.value==="cube") g=new THREE.BoxGeometry(0.15,0.15,0.15);
- if(shape.value==="triPrism") g=new THREE.CylinderGeometry(0.08,0.08,0.18,3);
- if(shape.value==="pyramid") g=new THREE.ConeGeometry(0.1,0.18,4);
+ let g, infoHTML="";
+ if(shape.value==="cube"){
+  g=new THREE.BoxGeometry(0.15,0.15,0.15);
+  infoHTML=`
+<b>LẬP PHƯƠNG</b><br>
+Diện tích: S = 6a²<br>
+Thể tích: V = a³
+`;
+ }
+ if(shape.value==="triPrism"){
+  g=new THREE.CylinderGeometry(0.08,0.08,0.18,3);
+  infoHTML=`
+<b>LĂNG TRỤ TAM GIÁC</b><br>
+Diện tích: S = 2S<sub>đáy</sub> + p<sub>đáy</sub>·h<br>
+Thể tích: V = S<sub>đáy</sub>·h
+`;
+ }
+ if(shape.value==="pyramid"){
+  g=new THREE.ConeGeometry(0.1,0.18,4);
+  infoHTML=`
+<b>CHÓP TỨ GIÁC</b><br>
+Diện tích: S = S<sub>đáy</sub> + S<sub>xq</sub><br>
+Thể tích: V = 1/3 · S<sub>đáy</sub> · h
+`;
+ }
+
+ info.innerHTML=infoHTML;
 
  g.clearGroups();
  const f=g.index.count/3;
@@ -102,78 +120,23 @@ function createShape(){
  );
  model.add(edges);
 
- createVerticesAndLabels(g);
+ addVertices(g);
 }
 
-function createVerticesAndLabels(g){
- const pos=g.attributes.position;
+function addVertices(g){
+ const p=g.attributes.position;
  const used={};
- const names=["A","B","C","D","E","F","G","H"];
- let idx=0;
-
- for(let i=0;i<pos.count;i++){
-  const key=`${pos.getX(i).toFixed(2)}_${pos.getY(i).toFixed(2)}_${pos.getZ(i).toFixed(2)}`;
-  if(used[key]) continue;
-  used[key]=true;
-
+ for(let i=0;i<p.count;i++){
+  const k=`${p.getX(i).toFixed(2)}_${p.getY(i).toFixed(2)}_${p.getZ(i).toFixed(2)}`;
+  if(used[k]) continue; used[k]=true;
   const v=new THREE.Mesh(
    new THREE.SphereGeometry(0.01,16,16),
    new THREE.MeshBasicMaterial({color:0xff0000})
   );
-  v.position.set(pos.getX(i),pos.getY(i),pos.getZ(i));
+  v.position.set(p.getX(i),p.getY(i),p.getZ(i));
   model.add(v);
   vertices.push(v);
-
-  if(idx<names.length){
-   const label=makeText(names[idx++]);
-   label.position.copy(v.position).add(new THREE.Vector3(0,0.015,0));
-   model.add(label);
-   labels.push(label);
-  }
  }
-}
-
-function makeText(t){
- const c=document.createElement("canvas");
- c.width=128;c.height=64;
- const ctx=c.getContext("2d");
- ctx.fillStyle="white";
- ctx.fillRect(0,0,128,64);
- ctx.fillStyle="black";
- ctx.font="32px Arial";
- ctx.textAlign="center";
- ctx.textBaseline="middle";
- ctx.fillText(t,64,32);
- const tex=new THREE.CanvasTexture(c);
- return new THREE.Sprite(new THREE.SpriteMaterial({map:tex}));
-}
-
-function onTap(e){
- const mouse=new THREE.Vector2(
-  (e.clientX/innerWidth)*2-1,
-  -(e.clientY/innerHeight)*2+1
- );
- const ray=new THREE.Raycaster();
- ray.setFromCamera(mouse,camera);
- const hits=ray.intersectObjects(vertices);
- if(hits.length){
-  selected.push(hits[0].object);
-  if(selected.length===2){
-   const d=selected[0].position.distanceTo(selected[1].position);
-   info.innerText="Độ dài cạnh ≈ "+(d*100).toFixed(1)+" cm";
-   selected=[];
-  }
- }
-}
-
-function toggleNet(){
- if(shape.value!=="cube") return;
- netOpen=!netOpen;
- model.children.forEach(o=>{
-  if(o.isMesh){
-   o.position.z=netOpen?Math.random()*0.1:0;
-  }
- });
 }
 
 function animate(){
