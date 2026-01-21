@@ -4,6 +4,11 @@ import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js
 let scene, camera, renderer
 let modelGroup, edgeHelper, vertexHelper
 let autoRotate = true
+let isNet = false
+
+let raycaster = new THREE.Raycaster()
+let pointer = new THREE.Vector2()
+let pickedVertices = []
 
 init()
 animate()
@@ -28,13 +33,17 @@ function init() {
   document.getElementById('toggleEdge').onclick = () => edgeHelper.visible = !edgeHelper.visible
   document.getElementById('toggleVertex').onclick = () => vertexHelper.visible = !vertexHelper.visible
   document.getElementById('toggleRotate').onclick = toggleRotate
+  document.getElementById('toggleNet').onclick = toggleNet
+
+  window.addEventListener('resize', onResize)
+  window.addEventListener('pointerdown', onPointerDown)
 
   createShape('box')
-  window.addEventListener('resize', onResize)
 }
 
 function createShape(type) {
   if (modelGroup) scene.remove(modelGroup)
+
   modelGroup = new THREE.Group()
 
   let geometry
@@ -81,11 +90,14 @@ function createShape(type) {
   modelGroup.add(vertexHelper)
   modelGroup.position.set(0, 0, -0.7)
   scene.add(modelGroup)
+
+  pickedVertices = []
+  isNet = false
 }
 
 function animate() {
   renderer.setAnimationLoop(() => {
-    if (modelGroup && autoRotate) {
+    if (modelGroup && autoRotate && !isNet) {
       modelGroup.rotation.y += 0.006
       modelGroup.rotation.x += 0.003
     }
@@ -99,13 +111,45 @@ function toggleRotate() {
     autoRotate ? 'Tắt xoay' : 'Bật xoay'
 }
 
+function toggleNet() {
+  if (!modelGroup) return
+  isNet = !isNet
+
+  modelGroup.rotation.set(0, 0, 0)
+
+  modelGroup.children.forEach((obj, i) => {
+    if (obj.type === 'Mesh') {
+      obj.position.x = isNet ? (i - 1) * 0.35 : 0
+      obj.position.z = -0.7
+    }
+  })
+}
+
+function onPointerDown(event) {
+  pointer.x = (event.clientX / window.innerWidth) * 2 - 1
+  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1
+
+  raycaster.setFromCamera(pointer, camera)
+  const intersects = raycaster.intersectObjects(vertexHelper.children, true)
+
+  if (intersects.length > 0) {
+    pickedVertices.push(intersects[0].object.position.clone())
+
+    if (pickedVertices.length === 2) {
+      const d = pickedVertices[0].distanceTo(pickedVertices[1])
+      alert(`Độ dài cạnh ≈ ${d.toFixed(2)} (đơn vị không gian AR)`)
+      pickedVertices = []
+    }
+  }
+}
+
 function onResize() {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
 }
 
-/* ===== HÀM HÌNH HỌC ===== */
+/* ===== HÌNH HỌC ===== */
 
 function triangularPrism() {
   const g = new THREE.BufferGeometry()
