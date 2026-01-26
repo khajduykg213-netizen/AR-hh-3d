@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<title>AR Hình học 3D – THCS & THPT</title>
+<title>AR Hình học 3D – Net – Đo cạnh</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{margin:0;overflow:hidden;font-family:Arial}
@@ -10,7 +10,7 @@ body{margin:0;overflow:hidden;font-family:Arial}
  position:fixed;top:10px;left:10px;
  background:rgba(255,255,255,0.97);
  padding:10px;border-radius:12px;
- max-width:240px;z-index:10
+ max-width:260px;z-index:10
 }
 select,button{width:100%;margin-top:6px;padding:6px}
 #info{font-size:13px;margin-top:6px;line-height:1.4}
@@ -22,21 +22,12 @@ select,button{width:100%;margin-top:6px;padding:6px}
 <select id="shape">
 <option value="cube">Lập phương</option>
 <option value="box">Hộp chữ nhật</option>
-<option value="triPrism">Lăng trụ tam giác</option>
-<option value="prism">Lăng trụ đứng</option>
-<option value="pyramid">Chóp tứ giác</option>
-<option value="triPyramid">Chóp tam giác</option>
 <option value="cylinder">Hình trụ</option>
 <option value="cone">Hình nón</option>
-<option value="sphere">Hình cầu</option>
 </select>
 
-<button id="edgesBtn">Ẩn / hiện cạnh</button>
-<button id="vertexBtn">Ẩn / hiện đỉnh</button>
-<button id="rotateBtn">Bật / tắt xoay</button>
-<button id="measureBtn">Đo cạnh AR</button>
 <button id="netBtn">Trải Net</button>
-
+<button id="measureBtn">Đo cạnh AR</button>
 <div id="info"></div>
 </div>
 
@@ -45,10 +36,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160/build/three.mod
 import { ARButton } from "https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/webxr/ARButton.js";
 
 let scene,camera,renderer;
-let model,edges,vertices=[],labels=[];
-let autoRotate=false;
-let measuring=false,points=[],measureLine;
-let net=false;
+let model,labels=[];
+let measuring=false,points=[],line;
 
 init(); animate();
 
@@ -64,151 +53,98 @@ function init(){
  scene.add(new THREE.HemisphereLight(0xffffff,0xbbbbff,1.2));
 
  shape.onchange=createShape;
- edgesBtn.onclick=()=>edges.visible=!edges.visible;
- vertexBtn.onclick=()=>vertices.forEach(v=>v.visible=!v.visible);
- rotateBtn.onclick=()=>autoRotate=!autoRotate;
- measureBtn.onclick=()=>measuring=!measuring;
  netBtn.onclick=toggleNet;
+ measureBtn.onclick=()=>measuring=!measuring;
 
  renderer.domElement.addEventListener("pointerdown",onTap);
-
  createShape();
  window.addEventListener("resize",resize);
 }
 
 function createShape(){
- if(model) scene.remove(model);
- vertices=[]; labels=[];
- if(measureLine) scene.remove(measureLine);
-
+ clearScene();
  let g,info="";
- switch(shape.value){
-  case "cube":
-   g=new THREE.BoxGeometry(0.15,0.15,0.15);
-   info="<b>LẬP PHƯƠNG</b><br>S=6a²<br>V=a³"; break;
-  case "box":
-   g=new THREE.BoxGeometry(0.18,0.12,0.1);
-   info="<b>HỘP CHỮ NHẬT</b><br>S=2(ab+bc+ac)<br>V=abc"; break;
-  case "triPrism":
-   g=new THREE.CylinderGeometry(0.08,0.08,0.18,3);
-   info="<b>LĂNG TRỤ TAM GIÁC</b><br>V=Sđ·h"; break;
-  case "prism":
-   g=new THREE.CylinderGeometry(0.08,0.08,0.18,6);
-   info="<b>LĂNG TRỤ ĐỨNG</b><br>V=Sđ·h"; break;
-  case "pyramid":
-   g=new THREE.ConeGeometry(0.1,0.18,4);
-   info="<b>CHÓP TỨ GIÁC</b><br>V=1/3·Sđ·h"; break;
-  case "triPyramid":
-   g=new THREE.ConeGeometry(0.1,0.18,3);
-   info="<b>CHÓP TAM GIÁC</b><br>V=1/3·Sđ·h"; break;
-  case "cylinder":
-   g=new THREE.CylinderGeometry(0.08,0.08,0.18,32);
-   info="<b>HÌNH TRỤ</b><br>V=πr²h"; break;
-  case "cone":
-   g=new THREE.ConeGeometry(0.09,0.18,32);
-   info="<b>HÌNH NÓN</b><br>V=1/3πr²h"; break;
-  case "sphere":
-   g=new THREE.SphereGeometry(0.1,32,32);
-   info="<b>HÌNH CẦU</b><br>V=4/3πr³"; break;
+ if(shape.value==="cube"){
+  g=new THREE.BoxGeometry(0.15,0.15,0.15);
+  info="a";
+  addLabel("a",0,0.09,0);
+ }
+ if(shape.value==="box"){
+  g=new THREE.BoxGeometry(0.18,0.12,0.1);
+  addLabel("a",0.1,0,0);
+  addLabel("b",0,0.07,0);
+  addLabel("c",0,0,0.07);
+ }
+ if(shape.value==="cylinder"){
+  g=new THREE.CylinderGeometry(0.07,0.07,0.18,32);
+  addLabel("r",0.08,0,0);
+  addLabel("h",0,0.1,0);
+ }
+ if(shape.value==="cone"){
+  g=new THREE.ConeGeometry(0.08,0.18,32);
+  addLabel("r",0.08,0,0);
+  addLabel("h",0,0.1,0);
  }
 
- infoDiv(info);
-
- g.clearGroups();
- const f=g.index?g.index.count/3:1;
- for(let i=0;i<f;i++) g.addGroup(i*3,3,i);
-
- const mats=[];
- for(let i=0;i<f;i++)
-  mats.push(new THREE.MeshStandardMaterial({
-   color:new THREE.Color().setHSL(i/f,0.85,0.6)
-  }));
-
- model=new THREE.Mesh(g,mats);
+ model=new THREE.Mesh(g,new THREE.MeshStandardMaterial({
+  color:0x4fc3f7,transparent:true,opacity:0.9
+ }));
  model.position.set(0,0,-0.6);
  scene.add(model);
-
- edges=new THREE.LineSegments(
-  new THREE.EdgesGeometry(g),
-  new THREE.LineBasicMaterial({color:0x000000})
- );
- model.add(edges);
-
- addVertices(g);
- addLabels();
-}
-
-function addVertices(g){
- if(!g.attributes.position) return;
- const p=g.attributes.position,used={};
- for(let i=0;i<p.count;i++){
-  const k=`${p.getX(i).toFixed(2)}_${p.getY(i).toFixed(2)}_${p.getZ(i).toFixed(2)}`;
-  if(used[k]) continue; used[k]=true;
-  const v=new THREE.Mesh(
-   new THREE.SphereGeometry(0.01,12,12),
-   new THREE.MeshBasicMaterial({color:0xff0000})
-  );
-  v.position.set(p.getX(i),p.getY(i),p.getZ(i));
-  model.add(v); vertices.push(v);
- }
+ infoDiv(info);
 }
 
 function addLabel(text,x,y,z){
- const c=document.createElement("canvas");
- c.width=256;c.height=128;
- const ctx=c.getContext("2d");
- ctx.fillStyle="blue";
+ const canvas=document.createElement("canvas");
+ canvas.width=256; canvas.height=128;
+ const ctx=canvas.getContext("2d");
+ ctx.fillStyle="red";
  ctx.font="48px Arial";
  ctx.fillText(text,100,70);
- const tex=new THREE.CanvasTexture(c);
- const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex}));
- s.scale.set(0.15,0.07,1);
- s.position.set(x,y,z);
- model.add(s); labels.push(s);
+ const tex=new THREE.CanvasTexture(canvas);
+ const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex}));
+ spr.scale.set(0.15,0.07,1);
+ spr.position.set(x,y,z);
+ labels.push(spr);
+ scene.add(spr);
 }
 
-function addLabels(){
- if(shape.value==="cube") addLabel("a",0,0.1,0);
- if(shape.value==="box"){
-  addLabel("a",0.1,0,0);
-  addLabel("b",0,0.08,0);
-  addLabel("c",0,0,0.06);
- }
- if(shape.value==="cylinder"||shape.value==="cone"){
-  addLabel("r",0.1,0,0);
-  addLabel("h",0,0.1,0);
- }
-}
-
-function onTap(){
+function onTap(e){
  if(!measuring) return;
- const p=new THREE.Vector3(0,0,-0.6).applyMatrix4(camera.matrixWorld);
+ const p=new THREE.Vector3(0,0,-0.5).applyMatrix4(camera.matrixWorld);
  points.push(p.clone());
  if(points.length===2){
   const g=new THREE.BufferGeometry().setFromPoints(points);
-  measureLine=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff0000}));
-  scene.add(measureLine);
+  line=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff0000}));
+  scene.add(line);
   const d=points[0].distanceTo(points[1]).toFixed(2);
-  infoDiv(info.innerHTML+"<br>Đo ≈ "+d+" m");
+  infoDiv("Độ dài ≈ "+d+" m");
   points=[];
  }
 }
 
+let net=false;
 function toggleNet(){
  if(!model) return;
  net=!net;
  model.children.forEach((m,i)=>{
-  if(m.position) m.position.x=net?i*0.18:0;
+  if(m.position){
+   m.position.x=net?i*0.18:0;
+  }
  });
+}
+
+function clearScene(){
+ if(model) scene.remove(model);
+ labels.forEach(l=>scene.remove(l));
+ labels=[];
+ if(line) scene.remove(line);
 }
 
 function infoDiv(t){ document.getElementById("info").innerHTML=t; }
 
 function animate(){
- renderer.setAnimationLoop(()=>{
-  if(model && autoRotate) model.rotation.y+=0.01;
-  renderer.render(scene,camera);
- });
+ renderer.setAnimationLoop(()=>renderer.render(scene,camera));
 }
 
 function resize(){
