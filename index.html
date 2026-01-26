@@ -10,7 +10,7 @@ body{margin:0;overflow:hidden;font-family:Arial}
  position:fixed;top:10px;left:10px;
  background:rgba(255,255,255,0.97);
  padding:10px;border-radius:12px;
- max-width:240px;z-index:10
+ max-width:260px;z-index:10
 }
 select,button{width:100%;margin-top:6px;padding:6px}
 #info{font-size:13px;margin-top:6px;line-height:1.4}
@@ -23,9 +23,7 @@ select,button{width:100%;margin-top:6px;padding:6px}
 <option value="cube">Lập phương</option>
 <option value="box">Hộp chữ nhật</option>
 <option value="triPrism">Lăng trụ tam giác</option>
-<option value="prism">Lăng trụ đứng</option>
 <option value="pyramid">Chóp tứ giác</option>
-<option value="triPyramid">Chóp tam giác</option>
 <option value="cylinder">Hình trụ</option>
 <option value="cone">Hình nón</option>
 <option value="sphere">Hình cầu</option>
@@ -34,7 +32,7 @@ select,button{width:100%;margin-top:6px;padding:6px}
 <button id="edgesBtn">Ẩn / hiện cạnh</button>
 <button id="vertexBtn">Ẩn / hiện đỉnh</button>
 <button id="rotateBtn">Bật / tắt xoay</button>
-<button id="measureBtn">Đo cạnh</button>
+<button id="measureBtn">Đo cạnh AR</button>
 <button id="netBtn">Trải Net / Gộp khối</button>
 
 <div id="info"></div>
@@ -45,41 +43,39 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160/build/three.mod
 import { ARButton } from "https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/webxr/ARButton.js";
 
 let scene,camera,renderer;
-let model,edges,vertices=[];
+let model,edges;
+let vertices=[];
 let autoRotate=false;
 let measuring=false;
 let pickedPoints=[];
-let measureLine;
+let measureLine, measureLabel;
 let net=false;
 
-let raycaster=new THREE.Raycaster();
-let mouse=new THREE.Vector2();
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
 
 init(); animate();
 
 function init(){
  scene=new THREE.Scene();
  camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.01,20);
+
  renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
  renderer.setSize(innerWidth,innerHeight);
  renderer.xr.enabled=true;
  document.body.appendChild(renderer.domElement);
  document.body.appendChild(ARButton.createButton(renderer));
 
- scene.add(new THREE.HemisphereLight(0xffffff,0xbbbbff,1.2));
+ scene.add(new THREE.HemisphereLight(0xffffff,0xbbbbff,1.3));
 
  shape.onchange=createShape;
  edgesBtn.onclick=()=>edges.visible=!edges.visible;
  vertexBtn.onclick=()=>vertices.forEach(v=>v.visible=!v.visible);
  rotateBtn.onclick=()=>autoRotate=!autoRotate;
- measureBtn.onclick=()=>{
-  measuring=!measuring;
-  pickedPoints=[];
- };
+ measureBtn.onclick=()=>measuring=!measuring;
  netBtn.onclick=toggleNet;
 
  renderer.domElement.addEventListener("pointerdown",onTap);
-
  createShape();
  window.addEventListener("resize",resize);
 }
@@ -87,7 +83,8 @@ function init(){
 function createShape(){
  if(model) scene.remove(model);
  if(measureLine) scene.remove(measureLine);
- vertices=[];
+ if(measureLabel) scene.remove(measureLabel);
+ vertices=[]; pickedPoints=[];
 
  let g,info="";
  switch(shape.value){
@@ -96,19 +93,13 @@ function createShape(){
    info="<b>LẬP PHƯƠNG</b><br>S=6a²<br>V=a³"; break;
   case "box":
    g=new THREE.BoxGeometry(0.18,0.12,0.1);
-   info="<b>HỘP CHỮ NHẬT</b><br>S=2(ab+bc+ac)<br>V=abc"; break;
+   info="<b>HỘP CHỮ NHẬT</b><br>V=abc"; break;
   case "triPrism":
    g=new THREE.CylinderGeometry(0.08,0.08,0.18,3);
    info="<b>LĂNG TRỤ TAM GIÁC</b><br>V=Sđ·h"; break;
-  case "prism":
-   g=new THREE.CylinderGeometry(0.08,0.08,0.18,6);
-   info="<b>LĂNG TRỤ ĐỨNG</b><br>V=Sđ·h"; break;
   case "pyramid":
    g=new THREE.ConeGeometry(0.1,0.18,4);
    info="<b>CHÓP TỨ GIÁC</b><br>V=1/3·Sđ·h"; break;
-  case "triPyramid":
-   g=new THREE.ConeGeometry(0.1,0.18,3);
-   info="<b>CHÓP TAM GIÁC</b><br>V=1/3·Sđ·h"; break;
   case "cylinder":
    g=new THREE.CylinderGeometry(0.08,0.08,0.18,32);
    info="<b>HÌNH TRỤ</b><br>V=πr²h"; break;
@@ -151,73 +142,68 @@ function addVertices(g){
   const k=`${p.getX(i).toFixed(2)}_${p.getY(i).toFixed(2)}_${p.getZ(i).toFixed(2)}`;
   if(used[k]) continue; used[k]=true;
   const v=new THREE.Mesh(
-   new THREE.SphereGeometry(0.01,12,12),
+   new THREE.SphereGeometry(0.008,12,12),
    new THREE.MeshBasicMaterial({color:0xff0000})
   );
   v.position.set(p.getX(i),p.getY(i),p.getZ(i));
-  model.add(v);
-  vertices.push(v);
+  model.add(v); vertices.push(v);
  }
 }
 
 function onTap(e){
  if(!measuring) return;
 
- mouse.x=(e.clientX/innerWidth)*2-1;
- mouse.y=-(e.clientY/innerHeight)*2+1;
+ mouse.x=(e.clientX/window.innerWidth)*2-1;
+ mouse.y=-(e.clientY/window.innerHeight)*2+1;
 
  raycaster.setFromCamera(mouse,camera);
- const hit=raycaster.intersectObjects(vertices);
+ const hit=raycaster.intersectObject(model,true);
+ if(!hit.length) return;
 
- if(hit.length>0){
-  pickedPoints.push(hit[0].object.position.clone());
+ pickedPoints.push(hit[0].point.clone());
 
-  if(pickedPoints.length===2){
-   drawMeasure(pickedPoints[0],pickedPoints[1]);
-   pickedPoints=[];
-   measuring=false;
-  }
+ if(pickedPoints.length===2){
+  const g=new THREE.BufferGeometry().setFromPoints(pickedPoints);
+  measureLine=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff0000}));
+  scene.add(measureLine);
+
+  const d=pickedPoints[0].distanceTo(pickedPoints[1]);
+  const mid=pickedPoints[0].clone().add(pickedPoints[1]).multiplyScalar(0.5);
+  measureLabel=createText(d.toFixed(3)+" m");
+  measureLabel.position.copy(mid);
+  scene.add(measureLabel);
+
+  infoDiv(document.getElementById("info").innerHTML+
+   `<br>Đo ≈ ${d.toFixed(3)} m`);
+
+  pickedPoints=[];
  }
 }
 
-function drawMeasure(p1,p2){
- if(measureLine) scene.remove(measureLine);
-
- const g=new THREE.BufferGeometry().setFromPoints([p1,p2]);
- measureLine=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff0000}));
- scene.add(measureLine);
-
- const d=p1.distanceTo(p2);
-
- const mid=p1.clone().add(p2).multiplyScalar(0.5);
- addLabel(d.toFixed(3)+" m",mid);
-
- infoDiv(info.innerHTML+"<br><b>Đo ≈ "+d.toFixed(3)+" m</b>");
-}
-
-function addLabel(text,pos){
+function createText(txt){
  const c=document.createElement("canvas");
  c.width=256;c.height=128;
  const ctx=c.getContext("2d");
- ctx.fillStyle="red";
- ctx.font="40px Arial";
- ctx.fillText(text,20,70);
- const tex=new THREE.CanvasTexture(c);
- const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false}));
+ ctx.fillStyle="blue";
+ ctx.font="36px Arial";
+ ctx.fillText(txt,20,70);
+ const t=new THREE.CanvasTexture(c);
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t}));
  s.scale.set(0.18,0.09,1);
- s.position.copy(pos);
- scene.add(s);
+ return s;
 }
 
 function toggleNet(){
- if(!model) return;
+ if(shape.value!=="cube") return;
  net=!net;
  model.children.forEach((m,i)=>{
-  if(m.position) m.position.x=net?i*0.18:0;
+  if(m.isMesh){
+   m.rotation.y=net?Math.PI/2:0;
+  }
  });
 }
 
-function infoDiv(t){document.getElementById("info").innerHTML=t;}
+function infoDiv(t){ document.getElementById("info").innerHTML=t; }
 
 function animate(){
  renderer.setAnimationLoop(()=>{
