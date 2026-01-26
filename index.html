@@ -1,174 +1,136 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>AR Hình học 3D – Trải Net</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- THREE -->
-  <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
-
-  <!-- GSAP animation -->
-  <script src="https://unpkg.com/gsap@3.12.2/dist/gsap.min.js"></script>
-
-  <style>
-    body { margin: 0; overflow: hidden; font-family: Arial; }
-    #ui {
-      position: absolute;
-      top: 10px; left: 10px;
-      background: rgba(255,255,255,0.95);
-      padding: 10px;
-      border-radius: 8px;
-      z-index: 10;
-    }
-    button {
-      width: 200px;
-      margin-bottom: 6px;
-      padding: 6px;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Trải Net Hình Lập Phương – Chuẩn Toán</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"></script>
+<style>
+body{margin:0;overflow:hidden;font-family:Arial}
+#ui{
+ position:fixed;top:10px;left:10px;
+ background:#fff;padding:10px;border-radius:10px
+}
+button{width:200px;margin-bottom:6px;padding:6px}
+</style>
 </head>
 
 <body>
-
 <div id="ui">
-  <button onclick="showCylinder()">Hiển thị hình trụ 3D</button>
-  <button onclick="unfoldCylinder()">Trải Net có animation</button>
+  <button onclick="createCube()">Hiển thị lập phương 3D</button>
+  <button onclick="unfoldCube()">Trải Net (chuẩn Toán)</button>
 </div>
 
 <script>
-/* ================== SCENE ================== */
-let scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf5f5f5);
+/* ===== SCENE ===== */
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xf2f2f2);
 
-let camera = new THREE.PerspectiveCamera(
-  60, window.innerWidth/window.innerHeight, 0.01, 100
-);
-camera.position.set(2, 2, 3);
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,100);
+camera.position.set(3,3,4);
 
-let renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
-let controls = new THREE.OrbitControls(camera, renderer.domElement);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
 
-/* ================== LIGHT ================== */
-scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-let light = new THREE.DirectionalLight(0xffffff, 0.8);
-light.position.set(5, 10, 5);
+/* ===== LIGHT ===== */
+scene.add(new THREE.AmbientLight(0xffffff,0.7));
+const light=new THREE.DirectionalLight(0xffffff,0.8);
+light.position.set(5,10,5);
 scene.add(light);
 
-/* ================== GLOBAL ================== */
-let currentMesh = null;
-let currentNet = null;
+/* ===== GLOBAL ===== */
+let cubeGroup=null;
+let faces=[];
 
-/* ================== HÌNH TRỤ 3D ================== */
-function showCylinder() {
-  clearAll();
+/* ===== TẠO LẬP PHƯƠNG ===== */
+function createCube(){
+ clearAll();
 
-  const geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x4fc3f7,
-    transparent: true,
-    opacity: 0.9
+ cubeGroup=new THREE.Group();
+ const a=1;
+
+ const materials=[
+  0xff8a80, // trước
+  0x80d8ff, // sau
+  0xccff90, // phải
+  0xffff8d, // trái
+  0xb388ff, // trên
+  0xffcc80  // dưới
+ ];
+
+ const positions=[
+  [0,0,a/2],[0,0,-a/2],[a/2,0,0],[-a/2,0,0],[0,a/2,0],[0,-a/2,0]
+ ];
+
+ const rotations=[
+  [0,0,0],[0,Math.PI,0],[0,-Math.PI/2,0],[0,Math.PI/2,0],[-Math.PI/2,0],[Math.PI/2,0]
+ ];
+
+ for(let i=0;i<6;i++){
+  const geo=new THREE.PlaneGeometry(a,a);
+  const mat=new THREE.MeshStandardMaterial({
+    color:materials[i],
+    side:THREE.DoubleSide
   });
+  const face=new THREE.Mesh(geo,mat);
+  face.position.set(...positions[i]);
+  face.rotation.set(...rotations[i]);
 
-  currentMesh = new THREE.Mesh(geo, mat);
-  scene.add(currentMesh);
+  cubeGroup.add(face);
+  faces.push(face);
+ }
+
+ scene.add(cubeGroup);
 }
 
-/* ================== TRẢI NET ================== */
-function unfoldCylinder() {
-  clearAll();
+/* ===== TRẢI NET CHUẨN ===== */
+function unfoldCube(){
+ if(!cubeGroup) return;
 
-  const radius = 0.5;
-  const height = 1;
-  const segments = 20;
+ // Mặt đáy giữ nguyên
+ const base=faces[5];
 
-  const netGroup = new THREE.Group();
+ // Các mặt xung quanh xoay quanh CẠNH
+ gsap.to(faces[0].rotation,{x:-Math.PI/2,duration:1});
+ gsap.to(faces[1].rotation,{x:Math.PI/2,duration:1});
+ gsap.to(faces[2].rotation,{z:Math.PI/2,duration:1});
+ gsap.to(faces[3].rotation,{z:-Math.PI/2,duration:1});
 
-  /* ===== MẶT XUNG QUANH ===== */
-  const faceWidth = (2 * Math.PI * radius) / segments;
+ // Mặt trên mở tiếp từ mặt trước
+ gsap.to(faces[4].rotation,{x:-Math.PI,duration:1,delay:0.8});
 
-  for (let i = 0; i < segments; i++) {
-    const geo = new THREE.PlaneGeometry(faceWidth, height);
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x4fc3f7,
-      side: THREE.DoubleSide
-    });
-
-    const face = new THREE.Mesh(geo, mat);
-
-    // Nằm phẳng
-    face.rotation.x = -Math.PI / 2;
-
-    // Xếp ngang
-    face.position.x = i * faceWidth - (segments * faceWidth) / 2;
-    face.position.y = 0;
-    face.position.z = 0;
-
-    // Animation bung mặt
-    face.scale.x = 0;
-    gsap.to(face.scale, {
-      x: 1,
-      duration: 0.6,
-      delay: i * 0.04,
-      ease: "power2.out"
-    });
-
-    netGroup.add(face);
-  }
-
-  /* ===== ĐÁY DƯỚI ===== */
-  const baseGeo = new THREE.CircleGeometry(radius, 40);
-  const baseMat = new THREE.MeshStandardMaterial({
-    color: 0xffcc80,
-    side: THREE.DoubleSide
-  });
-
-  const bottom = new THREE.Mesh(baseGeo, baseMat);
-  bottom.rotation.x = -Math.PI / 2;
-  bottom.position.z = height / 2 + radius;
-  netGroup.add(bottom);
-
-  /* ===== ĐÁY TRÊN ===== */
-  const top = bottom.clone();
-  top.position.z = -height / 2 - radius;
-  netGroup.add(top);
-
-  currentNet = netGroup;
-  scene.add(netGroup);
+ // Đưa toàn bộ xuống mặt phẳng
+ gsap.to(cubeGroup.position,{y:-0.5,duration:1});
 }
 
-/* ================== CLEAR ================== */
-function clearAll() {
-  if (currentMesh) {
-    scene.remove(currentMesh);
-    currentMesh = null;
-  }
-  if (currentNet) {
-    scene.remove(currentNet);
-    currentNet = null;
-  }
+/* ===== CLEAR ===== */
+function clearAll(){
+ if(cubeGroup){
+  scene.remove(cubeGroup);
+  cubeGroup=null;
+  faces=[];
+ }
 }
 
-/* ================== RESIZE ================== */
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+/* ===== RESIZE ===== */
+window.onresize=()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+}
 
-/* ================== LOOP ================== */
-function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
+/* ===== LOOP ===== */
+function animate(){
+ requestAnimationFrame(animate);
+ controls.update();
+ renderer.render(scene,camera);
 }
 animate();
 </script>
-
 </body>
 </html>
