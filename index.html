@@ -1,136 +1,558 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Trải Net Hình Lập Phương – Chuẩn Toán</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"></script>
-<style>
-body{margin:0;overflow:hidden;font-family:Arial}
-#ui{
- position:fixed;top:10px;left:10px;
- background:#fff;padding:10px;border-radius:10px
-}
-button{width:200px;margin-bottom:6px;padding:6px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Geometry AR - Pure Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f4f8;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #1a202c;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            pointer-events: auto; /* Cho phép click vào select */
+            max-width: 300px;
+            z-index: 10;
+        }
+        h2 { margin: 0 0 8px 0; font-size: 1.25rem; font-weight: bold; }
+        ul { margin: 0 0 12px 0; padding-left: 20px; font-size: 0.9rem; line-height: 1.5; pointer-events: none; }
+        p { margin: 12px 0 0 0; font-size: 0.85rem; color: #4a5568; pointer-events: none; }
+        select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e0;
+            font-size: 1rem;
+            background-color: white;
+            cursor: pointer;
+            outline: none;
+            margin-bottom: 8px;
+        }
+    </style>
+    <!-- Import maps polyfill -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
 </head>
-
 <body>
-<div id="ui">
-  <button onclick="createCube()">Hiển thị lập phương 3D</button>
-  <button onclick="unfoldCube()">Trải Net (chuẩn Toán)</button>
-</div>
+    <div id="info">
+        <h2>Chọn hình học</h2>
+        <select id="shapeSelector">
+            <option value="pyramid">Hình chóp S.ABC</option>
+            <option value="prism">Hình lăng trụ tam giác</option>
+            <option value="sphere">Hình cầu</option>
+            <option value="ellipsoid">Hình Elip (Ellipsoid)</option>
+            <option value="cylinder">Hình trụ</option>
+            <option value="cone">Hình nón</option>
+            <option value="torus">Hình xuyến (Torus)</option>
+        </select>
+        <div style="margin-top: 12px;">
+            <label for="unfoldSlider"><strong>Khai triển hình:</strong></label>
+            <input type="range" id="unfoldSlider" min="0" max="1" step="0.01" value="0" style="width: 100%;">
+        </div>
+        <ul>
+            <li><strong>Chuột trái:</strong> Xoay mô hình</li>
+            <li><strong>Cuộn chuột:</strong> Phóng to / Thu nhỏ</li>
+            <li><strong>Chuột phải:</strong> Di chuyển (Pan)</li>
+        </ul>
+        <p>Nhấn nút <strong>START AR</strong> bên dưới để đặt hình vào không gian thực.</p>
+    </div>
 
-<script>
-/* ===== SCENE ===== */
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0xf2f2f2);
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,100);
-camera.position.set(3,3,4);
+        let container;
+        let camera, scene, renderer;
+        let controller;
+        let reticle;
+        let hitTestSource = null;
+        let hitTestSourceRequested = false;
+        let mathGroup;
+        let currentShapeGroup;
+        let controls;
+        let unfoldableFaces = [];
 
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
-document.body.appendChild(renderer.domElement);
+        init();
 
-const controls=new THREE.OrbitControls(camera,renderer.domElement);
+        function init() {
+            container = document.createElement('div');
+            document.body.appendChild(container);
 
-/* ===== LIGHT ===== */
-scene.add(new THREE.AmbientLight(0xffffff,0.7));
-const light=new THREE.DirectionalLight(0xffffff,0.8);
-light.position.set(5,10,5);
-scene.add(light);
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f4f8);
 
-/* ===== GLOBAL ===== */
-let cubeGroup=null;
-let faces=[];
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(6, 5, 6);
+            camera.lookAt(0, 0, 0);
 
-/* ===== TẠO LẬP PHƯƠNG ===== */
-function createCube(){
- clearAll();
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
 
- cubeGroup=new THREE.Group();
- const a=1;
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7);
+            scene.add(directionalLight);
 
- const materials=[
-  0xff8a80, // trước
-  0x80d8ff, // sau
-  0xccff90, // phải
-  0xffff8d, // trái
-  0xb388ff, // trên
-  0xffcc80  // dưới
- ];
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            container.appendChild(renderer.domElement);
 
- const positions=[
-  [0,0,a/2],[0,0,-a/2],[a/2,0,0],[-a/2,0,0],[0,a/2,0],[0,-a/2,0]
- ];
+            document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
- const rotations=[
-  [0,0,0],[0,Math.PI,0],[0,-Math.PI/2,0],[0,Math.PI/2,0],[-Math.PI/2,0],[Math.PI/2,0]
- ];
+            // Hệ trục tọa độ toán học Oxyz (Z hướng lên)
+            mathGroup = new THREE.Group();
+            mathGroup.rotation.x = -Math.PI / 2;
+            scene.add(mathGroup);
 
- for(let i=0;i<6;i++){
-  const geo=new THREE.PlaneGeometry(a,a);
-  const mat=new THREE.MeshStandardMaterial({
-    color:materials[i],
-    side:THREE.DoubleSide
-  });
-  const face=new THREE.Mesh(geo,mat);
-  face.position.set(...positions[i]);
-  face.rotation.set(...rotations[i]);
+            const axesHelper = new THREE.AxesHelper(4);
+            mathGroup.add(axesHelper);
 
-  cubeGroup.add(face);
-  faces.push(face);
- }
+            mathGroup.add(createLabel('X', new THREE.Vector3(4.2, 0, 0), '#ff0000'));
+            mathGroup.add(createLabel('Y', new THREE.Vector3(0, 4.2, 0), '#00aa00'));
+            mathGroup.add(createLabel('Z', new THREE.Vector3(0, 0, 4.2), '#0000ff'));
+            mathGroup.add(createLabel('O', new THREE.Vector3(-0.2, -0.2, -0.2), '#000000', 0.4));
 
- scene.add(cubeGroup);
-}
+            currentShapeGroup = new THREE.Group();
+            mathGroup.add(currentShapeGroup);
 
-/* ===== TRẢI NET CHUẨN ===== */
-function unfoldCube(){
- if(!cubeGroup) return;
+            // Khởi tạo hình mặc định
+            buildPyramid();
 
- // Mặt đáy giữ nguyên
- const base=faces[5];
+            // Lắng nghe sự kiện đổi hình
+            document.getElementById('shapeSelector').addEventListener('change', (e) => {
+                const shape = e.target.value;
+                if (shape === 'pyramid') buildPyramid();
+                else if (shape === 'prism') buildPrism();
+                else if (shape === 'sphere') buildSphere();
+                else if (shape === 'ellipsoid') buildEllipsoid();
+                else if (shape === 'cylinder') buildCylinder();
+                else if (shape === 'cone') buildCone();
+                else if (shape === 'torus') buildTorus();
+            });
 
- // Các mặt xung quanh xoay quanh CẠNH
- gsap.to(faces[0].rotation,{x:-Math.PI/2,duration:1});
- gsap.to(faces[1].rotation,{x:Math.PI/2,duration:1});
- gsap.to(faces[2].rotation,{z:Math.PI/2,duration:1});
- gsap.to(faces[3].rotation,{z:-Math.PI/2,duration:1});
+            document.getElementById('unfoldSlider').addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                unfoldableFaces.forEach(f => {
+                    f.group.setRotationFromAxisAngle(f.axis, f.maxAngle * val);
+                });
+            });
 
- // Mặt trên mở tiếp từ mặt trước
- gsap.to(faces[4].rotation,{x:-Math.PI,duration:1,delay:0.8});
+            // Điều khiển xoay, zoom
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
 
- // Đưa toàn bộ xuống mặt phẳng
- gsap.to(cubeGroup.position,{y:-0.5,duration:1});
-}
+            // AR Hit Test
+            controller = renderer.xr.getController(0);
+            controller.addEventListener('select', onSelect);
+            scene.add(controller);
 
-/* ===== CLEAR ===== */
-function clearAll(){
- if(cubeGroup){
-  scene.remove(cubeGroup);
-  cubeGroup=null;
-  faces=[];
- }
-}
+            const reticleGeometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
+            const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+            reticle.matrixAutoUpdate = false;
+            reticle.visible = false;
+            scene.add(reticle);
 
-/* ===== RESIZE ===== */
-window.onresize=()=>{
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-}
+            window.addEventListener('resize', onWindowResize);
 
-/* ===== LOOP ===== */
-function animate(){
- requestAnimationFrame(animate);
- controls.update();
- renderer.render(scene,camera);
-}
-animate();
-</script>
+            renderer.setAnimationLoop(render);
+        }
+
+        // --- CÁC HÀM TIỆN ÍCH VẼ HÌNH ---
+
+        function clearShape() {
+            while(currentShapeGroup.children.length > 0){ 
+                currentShapeGroup.remove(currentShapeGroup.children[0]); 
+            }
+            unfoldableFaces = [];
+            document.getElementById('unfoldSlider').value = 0;
+        }
+
+        function createLabel(text, position, color, size = 0.5) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.font = 'Bold 64px Arial';
+                ctx.fillStyle = color;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, 64, 64);
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.position.copy(position);
+            sprite.scale.set(size, size, size);
+            return sprite;
+        }
+
+        function addPoint(v, labelText) {
+            const geometry = new THREE.SphereGeometry(0.06, 16, 16);
+            const material = new THREE.MeshBasicMaterial({ color: 0x333333 });
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.copy(v);
+            currentShapeGroup.add(sphere);
+
+            if (labelText) {
+                const label = createLabel(labelText, v.clone().add(new THREE.Vector3(0.2, 0.2, 0.2)), '#000000', 0.6);
+                currentShapeGroup.add(label);
+            }
+        }
+
+        function addEdge(v1, v2, dashed = false) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([v1, v2]);
+            let material = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            if (dashed) {
+                material = new THREE.LineDashedMaterial({ color: 0x000000, dashSize: 0.1, gapSize: 0.1 });
+            }
+            const line = new THREE.Line(geometry, material);
+            if (dashed) line.computeLineDistances();
+            currentShapeGroup.add(line);
+        }
+
+        function addFace(v1, v2, v3, color) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([v1, v2, v3]);
+            geometry.computeVertexNormals();
+            const material = new THREE.MeshStandardMaterial({
+                color: color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, roughness: 0.2, metalness: 0.1
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            currentShapeGroup.add(mesh);
+        }
+
+        function addQuad(v1, v2, v3, v4, color) {
+            addFace(v1, v2, v3, color);
+            addFace(v1, v3, v4, color);
+        }
+
+        function createUnfoldable(vertices, pivotV1, pivotV2, color, parentNormal, parentCenter, labels) {
+            const localVertices = vertices.map(v => v.clone().sub(pivotV1));
+            const geometry = new THREE.BufferGeometry().setFromPoints(localVertices);
+            if (vertices.length === 3) geometry.setIndex([0, 1, 2]);
+            else if (vertices.length === 4) geometry.setIndex([0, 1, 2, 0, 2, 3]);
+            geometry.computeVertexNormals();
+            
+            const material = new THREE.MeshStandardMaterial({
+                color: color, transparent: true, opacity: 0.8, side: THREE.DoubleSide, roughness: 0.2, metalness: 0.1
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            const group = new THREE.Group();
+            group.position.copy(pivotV1);
+            group.add(mesh);
+            
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
+            group.add(line);
+
+            localVertices.forEach((lv, i) => {
+                const sphereGeom = new THREE.SphereGeometry(0.06, 16, 16);
+                const sphereMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+                const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+                sphere.position.copy(lv);
+                group.add(sphere);
+
+                if (labels && labels[i]) {
+                    const isPivot = (vertices[i].distanceTo(pivotV1) < 0.01 || vertices[i].distanceTo(pivotV2) < 0.01);
+                    if (!isPivot) {
+                        const label = createLabel(labels[i], lv.clone().add(new THREE.Vector3(0.2, 0.2, 0.2)), '#000000', 0.6);
+                        group.add(label);
+                    }
+                }
+            });
+
+            const axis = pivotV2.clone().sub(pivotV1).normalize();
+            
+            let v3Index = vertices.findIndex(v => v.distanceTo(pivotV1) > 0.01 && v.distanceTo(pivotV2) > 0.01);
+            const v3 = vertices[v3Index];
+            const edge1 = pivotV2.clone().sub(pivotV1);
+            const edge2 = v3.clone().sub(pivotV1);
+            const faceNormal = new THREE.Vector3().crossVectors(edge1, edge2).normalize();
+            
+            let bestAngle = 0;
+            let maxDist = -Infinity;
+            const localV3 = v3.clone().sub(pivotV1);
+            
+            for (let a = -Math.PI; a <= Math.PI; a += 0.05) {
+                const testNormal = faceNormal.clone().applyAxisAngle(axis, a);
+                if (Math.abs(Math.abs(testNormal.dot(parentNormal)) - 1) < 0.05) {
+                    const testV3 = localV3.clone().applyAxisAngle(axis, a).add(pivotV1);
+                    const dist = testV3.distanceTo(parentCenter);
+                    if (dist > maxDist) {
+                        maxDist = dist;
+                        bestAngle = a;
+                    }
+                }
+            }
+            
+            let center = new THREE.Vector3();
+            vertices.forEach(v => center.add(v));
+            center.divideScalar(vertices.length);
+
+            return { group, axis, maxAngle: bestAngle, normal: faceNormal, center: center };
+        }
+
+        // --- CÁC HÀM XÂY DỰNG HÌNH KHỐI ---
+
+        function buildPyramid() {
+            clearShape();
+            const A = new THREE.Vector3(2, 0, 0);
+            const B = new THREE.Vector3(0, 2, 0);
+            const C = new THREE.Vector3(-1, -1, 0);
+            const S = new THREE.Vector3(0, 0, 3);
+            const baseCenter = new THREE.Vector3().add(A).add(B).add(C).divideScalar(3);
+            const baseNormal = new THREE.Vector3(0, 0, 1);
+
+            // Base
+            addFace(A, B, C, 0xdddddd);
+            addEdge(A, B); addEdge(B, C); addEdge(C, A, true);
+            addPoint(A, 'A'); addPoint(B, 'B'); addPoint(C, 'C');
+
+            const f1 = createUnfoldable([A, B, S], A, B, 0xffadad, baseNormal, baseCenter, ['A', 'B', 'S']);
+            const f2 = createUnfoldable([B, C, S], B, C, 0x9bf6ff, baseNormal, baseCenter, ['B', 'C', 'S']);
+            const f3 = createUnfoldable([C, A, S], C, A, 0xfdffb6, baseNormal, baseCenter, ['C', 'A', 'S']);
+
+            currentShapeGroup.add(f1.group);
+            currentShapeGroup.add(f2.group);
+            currentShapeGroup.add(f3.group);
+
+            unfoldableFaces.push(f1, f2, f3);
+        }
+
+        function buildPrism() {
+            clearShape();
+            const A = new THREE.Vector3(2, 0, 0);
+            const B = new THREE.Vector3(0, 2, 0);
+            const C = new THREE.Vector3(-1, -1, 0);
+            const A1 = new THREE.Vector3(2, 0, 3);
+            const B1 = new THREE.Vector3(0, 2, 3);
+            const C1 = new THREE.Vector3(-1, -1, 3);
+            const baseCenter = new THREE.Vector3().add(A).add(B).add(C).divideScalar(3);
+            const baseNormal = new THREE.Vector3(0, 0, 1);
+
+            // Base
+            addFace(A, B, C, 0xdddddd);
+            addEdge(A, B); addEdge(B, C); addEdge(C, A, true);
+            addPoint(A, 'A'); addPoint(B, 'B'); addPoint(C, 'C');
+
+            const f1 = createUnfoldable([A, B, B1, A1], A, B, 0xffadad, baseNormal, baseCenter, ['A', 'B', "B'", "A'"]);
+            const f2 = createUnfoldable([B, C, C1, B1], B, C, 0x9bf6ff, baseNormal, baseCenter, ['B', 'C', "C'", "B'"]);
+            const f3 = createUnfoldable([C, A, A1, C1], C, A, 0xfdffb6, baseNormal, baseCenter, ['C', 'A', "A'", "C'"]);
+
+            // Top face attached to A1B1 of f1
+            const fTop = createUnfoldable([A1, B1, C1], A1, B1, 0xdddddd, f1.normal, f1.center, ["A'", "B'", "C'"]);
+
+            currentShapeGroup.add(f1.group);
+            currentShapeGroup.add(f2.group);
+            currentShapeGroup.add(f3.group);
+
+            f1.group.add(fTop.group);
+            fTop.group.position.sub(A); // f1's pivot is A
+
+            unfoldableFaces.push(f1, f2, f3, fTop);
+        }
+
+        function buildSphere() {
+            clearShape();
+            const radius = 2;
+            const center = new THREE.Vector3(0, 0, radius); // Đặt trên mặt phẳng XY
+
+            const geometry = new THREE.SphereGeometry(radius, 32, 32);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x9bf6ff, transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.1
+            });
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.copy(center);
+            currentShapeGroup.add(sphere);
+
+            // Lưới (Wireframe) để dễ nhìn dạng 3D
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 }));
+            line.position.copy(center);
+            currentShapeGroup.add(line);
+
+            addPoint(center, 'I');
+            // Vẽ bán kính minh họa
+            const edgePoint = new THREE.Vector3(radius, 0, radius);
+            addEdge(center, edgePoint, true);
+            addPoint(edgePoint, 'M');
+        }
+
+        function buildEllipsoid() {
+            clearShape();
+            const a = 2.5, b = 1.5, c = 2;
+            const center = new THREE.Vector3(0, 0, c); // Đặt trên mặt phẳng XY
+
+            const geometry = new THREE.SphereGeometry(1, 32, 32);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xfdffb6, transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.1
+            });
+            const ellipsoid = new THREE.Mesh(geometry, material);
+            ellipsoid.scale.set(a, b, c);
+            ellipsoid.position.copy(center);
+            currentShapeGroup.add(ellipsoid);
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 }));
+            line.scale.set(a, b, c);
+            line.position.copy(center);
+            currentShapeGroup.add(line);
+
+            addPoint(center, 'I');
+        }
+
+        function buildCylinder() {
+            clearShape();
+            const radius = 1.5;
+            const height = 3;
+            const center = new THREE.Vector3(0, 0, height / 2);
+
+            const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+            geometry.rotateX(Math.PI / 2);
+
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xa0c4ff, transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.1
+            });
+            const cylinder = new THREE.Mesh(geometry, material);
+            cylinder.position.copy(center);
+            currentShapeGroup.add(cylinder);
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 }));
+            line.position.copy(center);
+            currentShapeGroup.add(line);
+
+            addPoint(new THREE.Vector3(0, 0, 0), 'O');
+            addPoint(new THREE.Vector3(0, 0, height), "O'");
+            addEdge(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, height), true);
+        }
+
+        function buildCone() {
+            clearShape();
+            const radius = 2;
+            const height = 3;
+            const center = new THREE.Vector3(0, 0, height / 2);
+
+            const geometry = new THREE.ConeGeometry(radius, height, 32);
+            geometry.rotateX(Math.PI / 2);
+
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xffc6ff, transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.1
+            });
+            const cone = new THREE.Mesh(geometry, material);
+            cone.position.copy(center);
+            currentShapeGroup.add(cone);
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 }));
+            line.position.copy(center);
+            currentShapeGroup.add(line);
+
+            addPoint(new THREE.Vector3(0, 0, 0), 'O');
+            addPoint(new THREE.Vector3(0, 0, height), 'S');
+            addEdge(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, height), true);
+        }
+
+        function buildTorus() {
+            clearShape();
+            const radius = 2;
+            const tube = 0.6;
+            const center = new THREE.Vector3(0, 0, tube);
+
+            const geometry = new THREE.TorusGeometry(radius, tube, 16, 100);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xffd6a5, transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.1
+            });
+            const torus = new THREE.Mesh(geometry, material);
+            torus.position.copy(center);
+            currentShapeGroup.add(torus);
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 }));
+            line.position.copy(center);
+            currentShapeGroup.add(line);
+
+            addPoint(center, 'I');
+        }
+
+        // --- AR & RENDER ---
+
+        function onSelect() {
+            if (reticle.visible) {
+                mathGroup.position.setFromMatrixPosition(reticle.matrix);
+                mathGroup.scale.set(0.1, 0.1, 0.1); // Thu nhỏ khi đặt vào AR
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function render(timestamp, frame) {
+            controls.update();
+
+            if (frame) {
+                const referenceSpace = renderer.xr.getReferenceSpace();
+                const session = renderer.xr.getSession();
+
+                if (hitTestSourceRequested === false) {
+                    session.requestReferenceSpace('viewer').then(function (viewerSpace) {
+                        session.requestHitTestSource({ space: viewerSpace }).then(function (source) {
+                            hitTestSource = source;
+                        });
+                    });
+
+                    session.addEventListener('end', function () {
+                        hitTestSourceRequested = false;
+                        hitTestSource = null;
+                        reticle.visible = false;
+                        mathGroup.position.set(0, 0, 0);
+                        mathGroup.scale.set(1, 1, 1);
+                    });
+
+                    hitTestSourceRequested = true;
+                }
+
+                if (hitTestSource) {
+                    const hitTestResults = frame.getHitTestResults(hitTestSource);
+
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(referenceSpace);
+                        reticle.visible = true;
+                        reticle.matrix.fromArray(pose.transform.matrix);
+                    } else {
+                        reticle.visible = false;
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
 </body>
 </html>
