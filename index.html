@@ -61,6 +61,9 @@
             <option value="cylinder">Hình trụ</option>
             <option value="cone">Hình nón</option>
             <option value="torus">Hình xuyến (Torus)</option>
+            <option value="squarePyramid">Hình chóp tứ giác đều</option>
+            <option value="box">Hộp chữ nhật</option>
+            <option value="cube">Hình lập phương</option>
         </select>
         <div style="margin-top: 12px;">
             <label for="unfoldSlider"><strong>Khai triển hình:</strong></label>
@@ -145,6 +148,9 @@
                 else if (shape === 'cylinder') buildCylinder();
                 else if (shape === 'cone') buildCone();
                 else if (shape === 'torus') buildTorus();
+                else if (shape === 'squarePyramid') buildSquarePyramid();
+                else if (shape === 'box') buildBox();
+                else if (shape === 'cube') buildCube();
             });
 
             document.getElementById('unfoldSlider').addEventListener('input', (e) => {
@@ -547,6 +553,96 @@
             currentShapeGroup.add(line);
 
             addPoint(center, 'I');
+        }
+
+        function buildSquarePyramid() {
+            clearShape();
+            const half = 1.5;
+            const h = 3;
+            const A = new THREE.Vector3(-half, -half, 0);
+            const B = new THREE.Vector3( half, -half, 0);
+            const C = new THREE.Vector3( half,  half, 0);
+            const D = new THREE.Vector3(-half,  half, 0);
+            const S = new THREE.Vector3(0, 0, h);
+            const baseCenter = new THREE.Vector3(0, 0, 0);
+            const baseNormal = new THREE.Vector3(0, 0, 1);
+
+            addFace(A, B, C, 0xdddddd); addFace(A, C, D, 0xdddddd);
+            addEdge(A, B); addEdge(B, C); addEdge(C, D); addEdge(D, A, true);
+            addPoint(A, 'A'); addPoint(B, 'B'); addPoint(C, 'C'); addPoint(D, 'D');
+
+            const f1 = createUnfoldable([A, B, S], A, B, 0xffadad, baseNormal, baseCenter, ['A', 'B', 'S']);
+            const f2 = createUnfoldable([B, C, S], B, C, 0xa0c4ff, baseNormal, baseCenter, ['B', 'C', 'S']);
+            const f3 = createUnfoldable([C, D, S], C, D, 0x9bf6ff, baseNormal, baseCenter, ['C', 'D', 'S']);
+            const f4 = createUnfoldable([D, A, S], D, A, 0xfdffb6, baseNormal, baseCenter, ['D', 'A', 'S']);
+
+            currentShapeGroup.add(f1.group); currentShapeGroup.add(f2.group);
+            currentShapeGroup.add(f3.group); currentShapeGroup.add(f4.group);
+            unfoldableFaces.push(f1, f2, f3, f4);
+        }
+
+        function buildBox() {
+            clearShape();
+            const lx = 1.5, ly = 1, lzh = 2.5;
+            const A  = new THREE.Vector3(-lx, -ly, 0);
+            const B  = new THREE.Vector3( lx, -ly, 0);
+            const C  = new THREE.Vector3( lx,  ly, 0);
+            const D  = new THREE.Vector3(-lx,  ly, 0);
+            const A1 = new THREE.Vector3(-lx, -ly, lzh * 2);
+            const B1 = new THREE.Vector3( lx, -ly, lzh * 2);
+            const C1 = new THREE.Vector3( lx,  ly, lzh * 2);
+            const D1 = new THREE.Vector3(-lx,  ly, lzh * 2);
+            const baseCenter = new THREE.Vector3(0, 0, 0);
+            const baseNormal = new THREE.Vector3(0, 0, 1);
+
+            addFace(A, B, C, 0xdddddd); addFace(A, C, D, 0xdddddd);
+            addEdge(A, B); addEdge(B, C); addEdge(C, D); addEdge(D, A, true);
+            addPoint(A, 'A'); addPoint(B, 'B'); addPoint(C, 'C'); addPoint(D, 'D');
+            addEdge(A, A1, true); addEdge(B, B1); addEdge(C, C1); addEdge(D, D1);
+            addEdge(A1, B1); addEdge(B1, C1); addEdge(C1, D1); addEdge(D1, A1);
+            addPoint(A1, "A'"); addPoint(B1, "B'"); addPoint(C1, "C'"); addPoint(D1, "D'");
+            addFace(A1, B1, C1, 0xdddddd); addFace(A1, C1, D1, 0xdddddd);
+
+            const fAB = createUnfoldable([A, B, B1, A1], A, B, 0xffadad, baseNormal, baseCenter, ['A', 'B', "B'", "A'"]);
+            const fBC = createUnfoldable([B, C, C1, B1], B, C, 0xa0c4ff, baseNormal, baseCenter, ['B', 'C', "C'", "B'"]);
+            const fCD = createUnfoldable([C, D, D1, C1], C, D, 0x9bf6ff, baseNormal, baseCenter, ['C', 'D', "D'", "C'"]);
+            const fDA = createUnfoldable([D, A, A1, D1], D, A, 0xfdffb6, baseNormal, baseCenter, ['D', 'A', "A'", "D'"]);
+
+            currentShapeGroup.add(fAB.group); currentShapeGroup.add(fBC.group);
+            currentShapeGroup.add(fCD.group); currentShapeGroup.add(fDA.group);
+            unfoldableFaces.push(fAB, fBC, fCD, fDA);
+        }
+
+        function buildCube() {
+            clearShape();
+            const s = 2;
+            const A  = new THREE.Vector3(-s/2, -s/2, 0);
+            const B  = new THREE.Vector3( s/2, -s/2, 0);
+            const C  = new THREE.Vector3( s/2,  s/2, 0);
+            const D  = new THREE.Vector3(-s/2,  s/2, 0);
+            const A1 = new THREE.Vector3(-s/2, -s/2, s);
+            const B1 = new THREE.Vector3( s/2, -s/2, s);
+            const C1 = new THREE.Vector3( s/2,  s/2, s);
+            const D1 = new THREE.Vector3(-s/2,  s/2, s);
+            const baseCenter = new THREE.Vector3(0, 0, 0);
+            const baseNormal = new THREE.Vector3(0, 0, 1);
+
+            addFace(A, B, C, 0xdddddd); addFace(A, C, D, 0xdddddd);
+            addEdge(A, B); addEdge(B, C); addEdge(C, D); addEdge(D, A, true);
+            addPoint(A, 'A'); addPoint(B, 'B'); addPoint(C, 'C'); addPoint(D, 'D');
+            addEdge(A, A1, true); addEdge(B, B1); addEdge(C, C1); addEdge(D, D1);
+            addEdge(A1, B1); addEdge(B1, C1); addEdge(C1, D1); addEdge(D1, A1);
+            addPoint(A1, "A'"); addPoint(B1, "B'"); addPoint(C1, "C'"); addPoint(D1, "D'");
+            addFace(A1, B1, C1, 0xdddddd); addFace(A1, C1, D1, 0xdddddd);
+
+            const fAB = createUnfoldable([A, B, B1, A1], A, B, 0xffadad, baseNormal, baseCenter, ['A', 'B', "B'", "A'"]);
+            const fBC = createUnfoldable([B, C, C1, B1], B, C, 0xa0c4ff, baseNormal, baseCenter, ['B', 'C', "C'", "B'"]);
+            const fCD = createUnfoldable([C, D, D1, C1], C, D, 0x9bf6ff, baseNormal, baseCenter, ['C', 'D', "D'", "C'"]);
+            const fDA = createUnfoldable([D, A, A1, D1], D, A, 0xfdffb6, baseNormal, baseCenter, ['D', 'A', "A'", "D'"]);
+
+            currentShapeGroup.add(fAB.group); currentShapeGroup.add(fBC.group);
+            currentShapeGroup.add(fCD.group); currentShapeGroup.add(fDA.group);
+            unfoldableFaces.push(fAB, fBC, fCD, fDA);
         }
 
         // --- AR & RENDER ---
