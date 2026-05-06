@@ -20,7 +20,7 @@
             padding: 16px;
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            pointer-events: auto; /* Cho phép click vào select */
+            pointer-events: auto;
             max-width: 300px;
             z-index: 10;
         }
@@ -39,7 +39,6 @@
             margin-bottom: 8px;
         }
     </style>
-    <!-- Import maps polyfill -->
     <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
     <script type="importmap">
     {
@@ -56,6 +55,7 @@
         <select id="shapeSelector">
             <option value="pyramid">Hình chóp S.ABC</option>
             <option value="prism">Hình lăng trụ tam giác</option>
+            <option value="quadPrism">Hình lăng trụ tứ giác</option>
             <option value="sphere">Hình cầu</option>
             <option value="ellipsoid">Hình Elip (Ellipsoid)</option>
             <option value="cylinder">Hình trụ</option>
@@ -118,7 +118,6 @@
 
             document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-            // Hệ trục tọa độ toán học Oxyz (Z hướng lên)
             mathGroup = new THREE.Group();
             mathGroup.rotation.x = -Math.PI / 2;
             scene.add(mathGroup);
@@ -134,14 +133,13 @@
             currentShapeGroup = new THREE.Group();
             mathGroup.add(currentShapeGroup);
 
-            // Khởi tạo hình mặc định
             buildPyramid();
 
-            // Lắng nghe sự kiện đổi hình
             document.getElementById('shapeSelector').addEventListener('change', (e) => {
                 const shape = e.target.value;
                 if (shape === 'pyramid') buildPyramid();
                 else if (shape === 'prism') buildPrism();
+                else if (shape === 'quadPrism') buildQuadPrism();
                 else if (shape === 'sphere') buildSphere();
                 else if (shape === 'ellipsoid') buildEllipsoid();
                 else if (shape === 'cylinder') buildCylinder();
@@ -156,12 +154,10 @@
                 });
             });
 
-            // Điều khiển xoay, zoom
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
 
-            // AR Hit Test
             controller = renderer.xr.getController(0);
             controller.addEventListener('select', onSelect);
             scene.add(controller);
@@ -325,7 +321,6 @@
             const baseCenter = new THREE.Vector3().add(A).add(B).add(C).divideScalar(3);
             const baseNormal = new THREE.Vector3(0, 0, 1);
 
-            // Base
             addFace(A, B, C, 0xdddddd);
             addEdge(A, B); addEdge(B, C); addEdge(C, A, true);
             addPoint(A, 'A'); addPoint(B, 'B'); addPoint(C, 'C');
@@ -352,7 +347,6 @@
             const baseCenter = new THREE.Vector3().add(A).add(B).add(C).divideScalar(3);
             const baseNormal = new THREE.Vector3(0, 0, 1);
 
-            // Base
             addFace(A, B, C, 0xdddddd);
             addEdge(A, B); addEdge(B, C); addEdge(C, A, true);
             addPoint(A, 'A'); addPoint(B, 'B'); addPoint(C, 'C');
@@ -361,7 +355,6 @@
             const f2 = createUnfoldable([B, C, C1, B1], B, C, 0x9bf6ff, baseNormal, baseCenter, ['B', 'C', "C'", "B'"]);
             const f3 = createUnfoldable([C, A, A1, C1], C, A, 0xfdffb6, baseNormal, baseCenter, ['C', 'A', "A'", "C'"]);
 
-            // Top face attached to A1B1 of f1
             const fTop = createUnfoldable([A1, B1, C1], A1, B1, 0xdddddd, f1.normal, f1.center, ["A'", "B'", "C'"]);
 
             currentShapeGroup.add(f1.group);
@@ -369,15 +362,76 @@
             currentShapeGroup.add(f3.group);
 
             f1.group.add(fTop.group);
-            fTop.group.position.sub(A); // f1's pivot is A
+            fTop.group.position.sub(A);
 
             unfoldableFaces.push(f1, f2, f3, fTop);
+        }
+
+        function buildQuadPrism() {
+            clearShape();
+
+            const A = new THREE.Vector3(-1.5, -1, 0);
+            const B = new THREE.Vector3( 1.5, -1, 0);
+            const C = new THREE.Vector3( 1.5,  1, 0);
+            const D = new THREE.Vector3(-1.5,  1, 0);
+
+            const h = 3;
+            const A1 = new THREE.Vector3(-1.5, -1, h);
+            const B1 = new THREE.Vector3( 1.5, -1, h);
+            const C1 = new THREE.Vector3( 1.5,  1, h);
+            const D1 = new THREE.Vector3(-1.5,  1, h);
+
+            const baseCenter = new THREE.Vector3(0, 0, 0);
+            const baseNormal = new THREE.Vector3(0, 0, 1);
+
+            addFace(A, B, C, 0xdddddd);
+            addFace(A, C, D, 0xdddddd);
+
+            addEdge(A, B);
+            addEdge(B, C);
+            addEdge(C, D);
+            addEdge(D, A, true);
+
+            addPoint(A, 'A');
+            addPoint(B, 'B');
+            addPoint(C, 'C');
+            addPoint(D, 'D');
+
+            addEdge(A, A1, true);
+            addEdge(B, B1);
+            addEdge(C, C1);
+            addEdge(D, D1);
+
+            addEdge(A1, B1);
+            addEdge(B1, C1);
+            addEdge(C1, D1);
+            addEdge(D1, A1);
+
+            addPoint(A1, "A'");
+            addPoint(B1, "B'");
+            addPoint(C1, "C'");
+            addPoint(D1, "D'");
+
+            addFace(A1, B1, C1, 0xdddddd);
+            addFace(A1, C1, D1, 0xdddddd);
+
+            const fABB1A1 = createUnfoldable([A, B, B1, A1], A, B, 0xffadad, baseNormal, baseCenter, ['A', 'B', "B'", "A'"]);
+            const fBCC1B1 = createUnfoldable([B, C, C1, B1], B, C, 0xa0c4ff, baseNormal, baseCenter, ['B', 'C', "C'", "B'"]);
+            const fCDD1C1 = createUnfoldable([C, D, D1, C1], C, D, 0x9bf6ff, baseNormal, baseCenter, ['C', 'D', "D'", "C'"]);
+            const fDAA1D1 = createUnfoldable([D, A, A1, D1], D, A, 0xfdffb6, baseNormal, baseCenter, ['D', 'A', "A'", "D'"]);
+
+            currentShapeGroup.add(fABB1A1.group);
+            currentShapeGroup.add(fBCC1B1.group);
+            currentShapeGroup.add(fCDD1C1.group);
+            currentShapeGroup.add(fDAA1D1.group);
+
+            unfoldableFaces.push(fABB1A1, fBCC1B1, fCDD1C1, fDAA1D1);
         }
 
         function buildSphere() {
             clearShape();
             const radius = 2;
-            const center = new THREE.Vector3(0, 0, radius); // Đặt trên mặt phẳng XY
+            const center = new THREE.Vector3(0, 0, radius);
 
             const geometry = new THREE.SphereGeometry(radius, 32, 32);
             const material = new THREE.MeshStandardMaterial({
@@ -387,14 +441,12 @@
             sphere.position.copy(center);
             currentShapeGroup.add(sphere);
 
-            // Lưới (Wireframe) để dễ nhìn dạng 3D
             const edges = new THREE.EdgesGeometry(geometry);
             const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 }));
             line.position.copy(center);
             currentShapeGroup.add(line);
 
             addPoint(center, 'I');
-            // Vẽ bán kính minh họa
             const edgePoint = new THREE.Vector3(radius, 0, radius);
             addEdge(center, edgePoint, true);
             addPoint(edgePoint, 'M');
@@ -403,7 +455,7 @@
         function buildEllipsoid() {
             clearShape();
             const a = 2.5, b = 1.5, c = 2;
-            const center = new THREE.Vector3(0, 0, c); // Đặt trên mặt phẳng XY
+            const center = new THREE.Vector3(0, 0, c);
 
             const geometry = new THREE.SphereGeometry(1, 32, 32);
             const material = new THREE.MeshStandardMaterial({
@@ -502,7 +554,7 @@
         function onSelect() {
             if (reticle.visible) {
                 mathGroup.position.setFromMatrixPosition(reticle.matrix);
-                mathGroup.scale.set(0.1, 0.1, 0.1); // Thu nhỏ khi đặt vào AR
+                mathGroup.scale.set(0.1, 0.1, 0.1);
             }
         }
 
